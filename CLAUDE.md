@@ -4,14 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AutoHotkey keyboard layout project.
+AutoHotkey v2 window management tool. Provides keyboard shortcuts (Ctrl+Shift + key) for snapping windows to grid zones across multiple monitors.
 
-## Build and Run
+## Running
 
-```bash
-# TODO: Add commands once project files are added
-```
+Run `layout.ahk` with AutoHotkey v2.
 
 ## Architecture
 
-TODO: Document architecture once project structure is established.
+```
+layout.ahk           # Entry point, hotkey definitions
+lib/
+  monitor.ahk        # Monitor detection, zone calculations (GetZone, GetWindowMonitor)
+  window.ahk         # Window manipulation (SnapToZone, MoveToMonitor)
+```
+
+- `lib/monitor.ahk` handles all monitor-related calculations including work area bounds and zone positions (halves, thirds, quadrants, center)
+- `lib/window.ahk` provides the main functions used by hotkeys: `SnapToZone(zone)` and `MoveToMonitor(direction)`
+- Hotkey modifier is `^+` (Ctrl+Shift)
