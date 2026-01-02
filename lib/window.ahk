@@ -184,6 +184,9 @@ ShowCollage() {
         monitorWindows[mon].Push(hwnd)
     }
 
+    ; Collect windows that don't fit on their monitor
+    overflowWindows := []
+
     ; Arrange windows on each monitor
     Loop monitorCount {
         wins := monitorWindows[A_Index]
@@ -211,10 +214,41 @@ ShowCollage() {
 
             x := area.left + col * cellW
             y := area.top + row * cellH
+            cellRight := x + cellW
+            cellBottom := y + cellH
 
             ; Adjust for borders
             borders := GetWindowBorders(hwnd)
             WinMove(x - borders.left, y - borders.top, cellW + borders.left + borders.right, cellH + borders.top + borders.bottom, hwnd)
+            Sleep(20)
+
+            ; Check if window fits in its cell
+            borders := GetWindowBorders(hwnd)
+            WinGetPos(&newX, &newY, &newW, &newH, hwnd)
+            visibleRight := newX + newW - borders.right
+            visibleBottom := newY + newH - borders.bottom
+
+            if (visibleRight > cellRight + 5 || visibleBottom > cellBottom + 5) {
+                ; Window doesn't fit, add to overflow list
+                overflowWindows.Push({hwnd: hwnd, fromMonitor: A_Index})
+            }
+        }
+    }
+
+    ; Move overflow windows to another monitor
+    if (overflowWindows.Length > 0 && monitorCount > 1) {
+        for item in overflowWindows {
+            hwnd := item.hwnd
+            fromMon := item.fromMonitor
+
+            ; Find another monitor
+            targetMon := (fromMon = 1) ? 2 : 1
+            targetArea := GetMonitorWorkArea(targetMon)
+
+            ; Place at top-left of target monitor, stacked
+            borders := GetWindowBorders(hwnd)
+            WinGetPos(, , &winW, &winH, hwnd)
+            WinMove(targetArea.left - borders.left, targetArea.top - borders.top, winW, winH, hwnd)
         }
     }
 }
@@ -240,7 +274,7 @@ RestoreWindowPositions() {
 
     for hwnd, pos in SavedWindowPositions {
         ; Skip if window no longer exists
-        if (!WinExist(hwnd))
+        if (!WinExist("ahk_id " . hwnd))
             continue
 
         ; Restore if minimized/maximized
