@@ -278,11 +278,10 @@ SaveWindowPositions() {
 
     for hwnd in windows {
         WinGetPos(&x, &y, &w, &h, hwnd)
-        procName := WinGetProcessName(hwnd)
-        title := WinGetTitle(hwnd)
+        procPath := WinGetProcessPath(hwnd)
 
-        ; Save as: processName|title|x|y|w|h
-        line := procName . "|" . title . "|" . x . "|" . y . "|" . w . "|" . h . "`n"
+        ; Save as: processPath<TAB>x<TAB>y<TAB>w<TAB>h
+        line := procPath . "`t" . x . "`t" . y . "`t" . w . "`t" . h . "`n"
         FileAppend(line, saveFile)
     }
 }
@@ -294,7 +293,8 @@ RestoreWindowPositions() {
     if (!FileExist(saveFile))
         return
 
-    ; Read all lines
+    ; Build a list of positions to restore (in order)
+    positions := []
     fileContent := FileRead(saveFile)
     lines := StrSplit(fileContent, "`n")
 
@@ -302,28 +302,42 @@ RestoreWindowPositions() {
         if (line = "")
             continue
 
-        parts := StrSplit(line, "|")
-        if (parts.Length < 6)
+        parts := StrSplit(line, "`t")
+        if (parts.Length < 5)
             continue
 
-        procName := parts[1]
-        title := parts[2]
-        x := Integer(parts[3])
-        y := Integer(parts[4])
-        w := Integer(parts[5])
-        h := Integer(parts[6])
-
-        ; Find window by process name and title
         try {
-            hwnd := WinExist(title . " ahk_exe " . procName)
-            if (!hwnd)
+            positions.Push({
+                procPath: parts[1],
+                x: Integer(parts[2]),
+                y: Integer(parts[3]),
+                w: Integer(parts[4]),
+                h: Integer(parts[5])
+            })
+        }
+    }
+
+    ; Get current windows and match them to saved positions
+    windows := GetAllWindows()
+    usedPositions := Map()
+
+    for hwnd in windows {
+        procPath := WinGetProcessPath(hwnd)
+
+        ; Find a matching position that hasn't been used
+        for i, pos in positions {
+            if (usedPositions.Has(i))
                 continue
 
-            ; Restore if minimized/maximized
-            if (WinGetMinMax(hwnd) != 0)
-                WinRestore(hwnd)
+            if (pos.procPath = procPath) {
+                ; Restore if minimized/maximized
+                if (WinGetMinMax(hwnd) != 0)
+                    WinRestore(hwnd)
 
-            WinMove(x, y, w, h, hwnd)
+                WinMove(pos.x, pos.y, pos.w, pos.h, hwnd)
+                usedPositions[i] := true
+                break
+            }
         }
     }
 }
