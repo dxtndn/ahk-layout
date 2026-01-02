@@ -2,9 +2,6 @@
 
 #Include "monitor.ahk"
 
-; Global storage for saved window positions
-global SavedWindowPositions := Map()
-
 ; Get the invisible border size for a window (Windows 10/11 shadow borders)
 GetWindowBorders(hwnd) {
     ; DWMWA_EXTENDED_FRAME_BOUNDS = 9
@@ -235,8 +232,9 @@ ShowCollage() {
         }
     }
 
-    ; Move overflow windows to another monitor
+    ; Move overflow windows to another monitor with cascade offset
     if (overflowWindows.Length > 0 && monitorCount > 1) {
+        cascadeOffset := 0
         for item in overflowWindows {
             hwnd := item.hwnd
             fromMon := item.fromMonitor
@@ -245,42 +243,77 @@ ShowCollage() {
             targetMon := (fromMon = 1) ? 2 : 1
             targetArea := GetMonitorWorkArea(targetMon)
 
-            ; Place at top-left of target monitor, stacked
+            ; Place with cascade offset so windows don't fully overlap
             borders := GetWindowBorders(hwnd)
             WinGetPos(, , &winW, &winH, hwnd)
-            WinMove(targetArea.left - borders.left, targetArea.top - borders.top, winW, winH, hwnd)
+            WinMove(targetArea.left - borders.left + cascadeOffset, targetArea.top - borders.top + cascadeOffset, winW, winH, hwnd)
+            cascadeOffset += 50
         }
     }
 }
 
-; Save positions of all visible windows
-SaveWindowPositions() {
-    global SavedWindowPositions
-    SavedWindowPositions := Map()
+; Get the save file path
+GetSaveFilePath() {
+    return A_ScriptDir . "\saved_positions.txt"
+}
 
+; Save positions of all visible windows to file
+SaveWindowPositions() {
     windows := GetAllWindows()
+    saveFile := GetSaveFilePath()
+
+    ; Delete old file
+    if (FileExist(saveFile))
+        FileDelete(saveFile)
+
     for hwnd in windows {
         WinGetPos(&x, &y, &w, &h, hwnd)
-        SavedWindowPositions[hwnd] := {x: x, y: y, w: w, h: h}
+        procName := WinGetProcessName(hwnd)
+        title := WinGetTitle(hwnd)
+
+        ; Save as: processName|title|x|y|w|h
+        line := procName . "|" . title . "|" . x . "|" . y . "|" . w . "|" . h . "`n"
+        FileAppend(line, saveFile)
     }
 }
 
-; Restore windows to their saved positions
+; Restore windows to their saved positions from file
 RestoreWindowPositions() {
-    global SavedWindowPositions
+    saveFile := GetSaveFilePath()
 
-    if (SavedWindowPositions.Count = 0)
+    if (!FileExist(saveFile))
         return
 
-    for hwnd, pos in SavedWindowPositions {
-        ; Skip if window no longer exists
-        if (!WinExist("ahk_id " . hwnd))
+    ; Read all lines
+    fileContent := FileRead(saveFile)
+    lines := StrSplit(fileContent, "`n")
+
+    for line in lines {
+        if (line = "")
             continue
 
-        ; Restore if minimized/maximized
-        if (WinGetMinMax(hwnd) != 0)
-            WinRestore(hwnd)
+        parts := StrSplit(line, "|")
+        if (parts.Length < 6)
+            continue
 
-        WinMove(pos.x, pos.y, pos.w, pos.h, hwnd)
+        procName := parts[1]
+        title := parts[2]
+        x := Integer(parts[3])
+        y := Integer(parts[4])
+        w := Integer(parts[5])
+        h := Integer(parts[6])
+
+        ; Find window by process name and title
+        try {
+            hwnd := WinExist(title . " ahk_exe " . procName)
+            if (!hwnd)
+                continue
+
+            ; Restore if minimized/maximized
+            if (WinGetMinMax(hwnd) != 0)
+                WinRestore(hwnd)
+
+            WinMove(x, y, w, h, hwnd)
+        }
     }
 }
