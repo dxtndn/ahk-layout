@@ -30,3 +30,7 @@
 ^+,::MoveToMonitor("prev")
 ^+.::MoveToMonitor("next")
 ^+Tab::ShowCollage()
+
+; --- Save/Restore Layout ---
+^+s::SaveWindowPositions()
+^+a::RestoreWindowPositions()

@@ -2,6 +2,9 @@
 
 #Include "monitor.ahk"
 
+; Global storage for saved window positions
+global SavedWindowPositions := Map()
+
 ; Get the invisible border size for a window (Windows 10/11 shadow borders)
 GetWindowBorders(hwnd) {
     ; DWMWA_EXTENDED_FRAME_BOUNDS = 9
@@ -168,5 +171,37 @@ ShowCollage() {
             borders := GetWindowBorders(hwnd)
             WinMove(x - borders.left, y - borders.top, cellW + borders.left + borders.right, cellH + borders.top + borders.bottom, hwnd)
         }
+    }
+}
+
+; Save positions of all visible windows
+SaveWindowPositions() {
+    global SavedWindowPositions
+    SavedWindowPositions := Map()
+
+    windows := GetAllWindows()
+    for hwnd in windows {
+        WinGetPos(&x, &y, &w, &h, hwnd)
+        SavedWindowPositions[hwnd] := {x: x, y: y, w: w, h: h}
+    }
+}
+
+; Restore windows to their saved positions
+RestoreWindowPositions() {
+    global SavedWindowPositions
+
+    if (SavedWindowPositions.Count = 0)
+        return
+
+    for hwnd, pos in SavedWindowPositions {
+        ; Skip if window no longer exists
+        if (!WinExist(hwnd))
+            continue
+
+        ; Restore if minimized/maximized
+        if (WinGetMinMax(hwnd) != 0)
+            WinRestore(hwnd)
+
+        WinMove(pos.x, pos.y, pos.w, pos.h, hwnd)
     }
 }
