@@ -2,6 +2,22 @@
 
 #Include "monitor.ahk"
 
+; Migrate old saved_positions.txt to new saves system
+MigrateOldSave() {
+    oldFile := A_ScriptDir . "\saved_positions.txt"
+    if (FileExist(oldFile)) {
+        result := MsgBox("Found an existing window layout save.`nWould you like to import it to the new multi-save system?", "Migrate Layout Save", "YesNo Icon?")
+        if (result = "Yes") {
+            newFile := GetSavesDir() . "\Migrated.txt"
+            FileMove(oldFile, newFile, false)
+            MsgBox("Saved as 'Migrated'. You can rename it using Ctrl+Shift+S.", "Migration Complete", "Icon!")
+        } else {
+            FileDelete(oldFile)
+        }
+    }
+}
+MigrateOldSave()
+
 ; Get the invisible border size for a window (Windows 10/11 shadow borders)
 GetWindowBorders(hwnd) {
     ; DWMWA_EXTENDED_FRAME_BOUNDS = 9
@@ -262,38 +278,52 @@ ShowCollage() {
     }
 }
 
-; Get the save file path
-GetSaveFilePath() {
-    return A_ScriptDir . "\saved_positions.txt"
+; ============================================
+; Multi-Save Window Position Manager
+; ============================================
+
+; Get the saves directory path, create if needed
+GetSavesDir() {
+    dir := A_ScriptDir . "\saves"
+    if (!DirExist(dir))
+        DirCreate(dir)
+    return dir
 }
 
-; Save positions of all visible windows to file
-SaveWindowPositions() {
-    windows := GetAllWindows()
-    saveFile := GetSaveFilePath()
+; Get array of all save names (without .txt extension)
+GetAllSaves() {
+    saves := []
+    dir := GetSavesDir()
+    Loop Files dir . "\*.txt" {
+        name := RegExReplace(A_LoopFileName, "\.txt$", "")
+        saves.Push(name)
+    }
+    return saves
+}
 
-    ; Delete old file
+; Save current window positions to a named slot
+SaveToSlot(name) {
+    windows := GetAllWindows()
+    saveFile := GetSavesDir() . "\" . name . ".txt"
+
     if (FileExist(saveFile))
         FileDelete(saveFile)
 
     for hwnd in windows {
         WinGetPos(&x, &y, &w, &h, hwnd)
         procPath := WinGetProcessPath(hwnd)
-
-        ; Save as: processPath<TAB>x<TAB>y<TAB>w<TAB>h
         line := procPath . "`t" . x . "`t" . y . "`t" . w . "`t" . h . "`n"
         FileAppend(line, saveFile)
     }
 }
 
-; Restore windows to their saved positions from file
-RestoreWindowPositions() {
-    saveFile := GetSaveFilePath()
+; Load window positions from a named slot
+LoadFromSlot(name) {
+    saveFile := GetSavesDir() . "\" . name . ".txt"
 
     if (!FileExist(saveFile))
         return
 
-    ; Build a list of positions to restore (in order)
     positions := []
     fileContent := FileRead(saveFile)
     lines := StrSplit(fileContent, "`n")
@@ -317,20 +347,17 @@ RestoreWindowPositions() {
         }
     }
 
-    ; Get current windows and match them to saved positions
     windows := GetAllWindows()
     usedPositions := Map()
 
     for hwnd in windows {
         procPath := WinGetProcessPath(hwnd)
 
-        ; Find a matching position that hasn't been used
         for i, pos in positions {
             if (usedPositions.Has(i))
                 continue
 
             if (pos.procPath = procPath) {
-                ; Restore if minimized/maximized
                 if (WinGetMinMax(hwnd) != 0)
                     WinRestore(hwnd)
 
@@ -339,5 +366,267 @@ RestoreWindowPositions() {
                 break
             }
         }
+    }
+}
+
+; Delete a named save
+DeleteSave(name) {
+    saveFile := GetSavesDir() . "\" . name . ".txt"
+    if (FileExist(saveFile))
+        FileDelete(saveFile)
+}
+
+; Rename a save
+RenameSave(oldName, newName) {
+    oldFile := GetSavesDir() . "\" . oldName . ".txt"
+    newFile := GetSavesDir() . "\" . newName . ".txt"
+    if (FileExist(oldFile))
+        FileMove(oldFile, newFile, true)
+}
+
+; ============================================
+; Save/Restore Dialog GUIs
+; ============================================
+
+; Apply dark mode styling to a GUI
+ApplyDarkMode(guiObj) {
+    ; Enable dark title bar (Windows 10 1809+ / Windows 11)
+    ; DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+    DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", guiObj.Hwnd, "Int", 20, "Int*", 1, "Int", 4)
+
+    ; Enable rounded corners (Windows 11)
+    ; DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2
+    DllCall("dwmapi\DwmSetWindowAttribute", "Ptr", guiObj.Hwnd, "Int", 33, "Int*", 2, "Int", 4)
+
+    ; Dark background
+    guiObj.BackColor := "1e1e1e"
+}
+
+; Create a dark styled button with rounded corners
+AddDarkButton(guiObj, options, text, callback) {
+    btn := guiObj.AddButton(options, text)
+    btn.OnEvent("Click", callback)
+
+    ; Get button dimensions and apply rounded corners
+    btn.GetPos(,, &w, &h)
+    radius := 8
+    hRgn := DllCall("CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", w, "Int", h, "Int", radius, "Int", radius, "Ptr")
+    DllCall("SetWindowRgn", "Ptr", btn.Hwnd, "Ptr", hRgn, "Int", true)
+
+    return btn
+}
+
+; Fade in animation for a GUI
+FadeIn(guiObj, duration := 120) {
+    guiObj.Opt("+E0x80000")  ; WS_EX_LAYERED
+    steps := 12
+    delay := duration // steps
+    Loop steps {
+        alpha := Round((A_Index / steps) * 255)
+        DllCall("SetLayeredWindowAttributes", "Ptr", guiObj.Hwnd, "UInt", 0, "UChar", alpha, "UInt", 2)
+        Sleep(delay)
+    }
+    guiObj.Opt("-E0x80000")  ; Remove layered style for better performance
+}
+
+; Enable dark mode for all controls in a GUI (call after Show)
+EnableDarkControls(guiObj) {
+    static DWMWA_USE_IMMERSIVE_DARK_MODE := 20
+    ; Set preferred app mode to dark
+    try {
+        DllCall("uxtheme\SetPreferredAppMode", "Int", 2)  ; ForceDark
+        DllCall("uxtheme\FlushMenuThemes")
+    }
+}
+
+; Track if dialogs are open
+global SaveDialogOpen := false
+global RestoreDialogOpen := false
+
+; Show the save dialog
+ShowSaveDialog() {
+    global SaveGui, SaveListView, SaveNameEdit, SaveDialogOpen
+
+    if (SaveDialogOpen)
+        return
+    SaveDialogOpen := true
+
+    SaveGui := Gui("+AlwaysOnTop", "Save Window Layout")
+    SaveGui.OnEvent("Close", OnSaveClose)
+    SaveGui.SetFont("s10", "Segoe UI")
+    ApplyDarkMode(SaveGui)
+
+    SaveGui.SetFont("s10 c99ccff", "Segoe UI")
+    SaveGui.AddText(, "Click to select, or type a new name:")
+    SaveGui.SetFont("s10 ce0e0e0", "Segoe UI")
+    SaveListView := SaveGui.AddListView("w300 h150 -Multi -Hdr Background2d2d2d ce0e0e0", ["Name"])
+    RefreshSaveList(SaveListView)
+
+    SaveGui.SetFont("s10 ce0e0e0", "Segoe UI")
+    SaveNameEdit := SaveGui.AddEdit("w300 Background2d2d2d ce0e0e0")
+
+    SaveGui.SetFont("s9 cffffff", "Segoe UI")
+    AddDarkButton(SaveGui, "xm w145 h30", "Save", OnSave)
+    AddDarkButton(SaveGui, "x+10 w145 h30", "Rename", OnSaveRename)
+    AddDarkButton(SaveGui, "xm w145 h30", "Delete", OnSaveDelete)
+    AddDarkButton(SaveGui, "x+10 w145 h30", "Cancel", OnSaveCancel)
+
+    SaveListView.OnEvent("ItemSelect", OnSaveListSelect)
+    SaveListView.OnEvent("DoubleClick", OnSaveListDoubleClick)
+
+    SaveGui.Show("Hide")
+    FadeIn(SaveGui)
+    SaveGui.Show()
+}
+
+; Refresh the save list in a ListView (with numbers)
+RefreshSaveList(lv) {
+    lv.Delete()
+    saves := GetAllSaves()
+    for i, name in saves {
+        lv.Add(, i . ". " . name)
+    }
+    lv.ModifyCol(1, "AutoHdr")
+}
+
+; Get save name without the number prefix
+StripNumber(text) {
+    return RegExReplace(text, "^\d+\.\s*", "")
+}
+
+; Get selected save name from ListView (strips number prefix)
+GetSelectedSave(lv) {
+    row := lv.GetNext(0, "F")
+    if (row = 0)
+        return ""
+    return StripNumber(lv.GetText(row, 1))
+}
+
+OnSave(*) {
+    global SaveGui, SaveNameEdit, SaveDialogOpen
+    name := Trim(SaveNameEdit.Value)
+    if (name = "" || InStr(name, "\") || InStr(name, "/") || InStr(name, ":"))
+        return
+    SaveToSlot(name)
+    SaveDialogOpen := false
+    SaveGui.Destroy()
+}
+
+OnSaveListSelect(lv, item, selected) {
+    global SaveNameEdit
+    if (selected && item > 0) {
+        SaveNameEdit.Value := StripNumber(lv.GetText(item, 1))
+    }
+}
+
+OnSaveDelete(*) {
+    global SaveListView
+    name := GetSelectedSave(SaveListView)
+    if (name = "")
+        return
+    DeleteSave(name)
+    RefreshSaveList(SaveListView)
+}
+
+OnSaveRename(*) {
+    global SaveListView, SaveNameEdit
+    oldName := GetSelectedSave(SaveListView)
+    newName := Trim(SaveNameEdit.Value)
+    if (oldName = "" || newName = "" || InStr(newName, "\") || InStr(newName, "/") || InStr(newName, ":"))
+        return
+    RenameSave(oldName, newName)
+    RefreshSaveList(SaveListView)
+    SaveNameEdit.Value := newName
+}
+
+OnSaveCancel(*) {
+    global SaveGui, SaveDialogOpen
+    SaveDialogOpen := false
+    SaveGui.Destroy()
+}
+
+OnSaveClose(*) {
+    global SaveDialogOpen
+    SaveDialogOpen := false
+}
+
+OnSaveListDoubleClick(lv, row) {
+    global SaveGui, SaveDialogOpen
+    if (row > 0) {
+        name := StripNumber(lv.GetText(row, 1))
+        SaveToSlot(name)
+        SaveDialogOpen := false
+        SaveGui.Destroy()
+    }
+}
+
+; Show the restore dialog
+ShowRestoreDialog() {
+    global RestoreGui, RestoreListView, RestoreDialogOpen
+
+    if (RestoreDialogOpen)
+        return
+    RestoreDialogOpen := true
+
+    RestoreGui := Gui("+AlwaysOnTop", "Restore Window Layout")
+    RestoreGui.OnEvent("Close", OnRestoreClose)
+    RestoreGui.SetFont("s10", "Segoe UI")
+    ApplyDarkMode(RestoreGui)
+
+    RestoreGui.SetFont("s10 c99ccff", "Segoe UI")
+    RestoreGui.AddText(, "Double-click to restore:")
+    RestoreGui.SetFont("s10 ce0e0e0", "Segoe UI")
+    RestoreListView := RestoreGui.AddListView("w300 h200 -Multi -Hdr Background2d2d2d ce0e0e0", ["Name"])
+    RefreshSaveList(RestoreListView)
+
+    RestoreGui.SetFont("s9 cffffff", "Segoe UI")
+    AddDarkButton(RestoreGui, "xm w145 h30", "Restore", OnRestore)
+    AddDarkButton(RestoreGui, "x+10 w145 h30", "Delete", OnRestoreDelete)
+    AddDarkButton(RestoreGui, "xm w300 h30", "Cancel", OnRestoreCancel)
+
+    RestoreListView.OnEvent("DoubleClick", OnRestoreDoubleClick)
+
+    RestoreGui.Show("Hide")
+    FadeIn(RestoreGui)
+    RestoreGui.Show()
+}
+
+OnRestore(*) {
+    global RestoreGui, RestoreListView, RestoreDialogOpen
+    name := GetSelectedSave(RestoreListView)
+    if (name = "")
+        return
+    RestoreDialogOpen := false
+    RestoreGui.Destroy()
+    LoadFromSlot(name)
+}
+
+OnRestoreDelete(*) {
+    global RestoreListView
+    name := GetSelectedSave(RestoreListView)
+    if (name = "")
+        return
+    DeleteSave(name)
+    RefreshSaveList(RestoreListView)
+}
+
+OnRestoreCancel(*) {
+    global RestoreGui, RestoreDialogOpen
+    RestoreDialogOpen := false
+    RestoreGui.Destroy()
+}
+
+OnRestoreClose(*) {
+    global RestoreDialogOpen
+    RestoreDialogOpen := false
+}
+
+OnRestoreDoubleClick(lv, row) {
+    global RestoreGui, RestoreDialogOpen
+    if (row > 0) {
+        name := StripNumber(lv.GetText(row, 1))
+        RestoreDialogOpen := false
+        RestoreGui.Destroy()
+        LoadFromSlot(name)
     }
 }

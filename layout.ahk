@@ -32,5 +32,5 @@
 ^+Tab::ShowCollage()
 
 ; --- Save/Restore Layout ---
-^+s::SaveWindowPositions()
-^+a::RestoreWindowPositions()
+^+s::ShowSaveDialog()
+^+a::ShowRestoreDialog()
