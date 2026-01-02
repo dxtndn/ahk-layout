@@ -290,15 +290,38 @@ GetSavesDir() {
     return dir
 }
 
-; Get array of all save names (without .txt extension)
+; Get array of all save names (without .txt extension), sorted by creation time
 GetAllSaves() {
     saves := []
     dir := GetSavesDir()
     Loop Files dir . "\*.txt" {
         name := RegExReplace(A_LoopFileName, "\.txt$", "")
-        saves.Push(name)
+        saves.Push({name: name, time: A_LoopFileTimeCreated})
     }
-    return saves
+    ; Sort by creation time (oldest first, newest at end)
+    SortByTime(saves)
+    ; Extract just the names
+    names := []
+    for item in saves {
+        names.Push(item.name)
+    }
+    return names
+}
+
+; Sort array of objects by time property (bubble sort)
+SortByTime(arr) {
+    n := arr.Length
+    Loop n - 1 {
+        i := A_Index
+        Loop n - i {
+            j := A_Index
+            if (arr[j].time > arr[j + 1].time) {
+                temp := arr[j]
+                arr[j] := arr[j + 1]
+                arr[j + 1] := temp
+            }
+        }
+    }
 }
 
 ; Save current window positions to a named slot
