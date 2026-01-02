@@ -35,12 +35,37 @@ SnapToZone(zone) {
     if (WinGetMinMax(hwnd) != 0)
         WinRestore(hwnd)
 
+    ; Save original position
+    WinGetPos(&origX, &origY, &origW, &origH, hwnd)
+
     monitorNum := GetWindowMonitor(hwnd)
     pos := GetZone(monitorNum, zone)
+    area := GetMonitorWorkArea(monitorNum)
 
     ; Adjust for invisible window borders
     borders := GetWindowBorders(hwnd)
-    WinMove(pos.x - borders.left, pos.y - borders.top, pos.w + borders.left + borders.right, pos.h + borders.top + borders.bottom, hwnd)
+    targetW := pos.w + borders.left + borders.right
+    targetH := pos.h + borders.top + borders.bottom
+
+    WinMove(pos.x - borders.left, pos.y - borders.top, targetW, targetH, hwnd)
+    Sleep(20)
+
+    ; Get actual position and visible bounds after move
+    borders := GetWindowBorders(hwnd)
+    WinGetPos(&newX, &newY, &newW, &newH, hwnd)
+    visibleLeft := newX + borders.left
+    visibleTop := newY + borders.top
+    visibleRight := newX + newW - borders.right
+    visibleBottom := newY + newH - borders.bottom
+
+    ; Check if window is fully contained within monitor work area
+    if (visibleLeft < area.left - 5
+        || visibleTop < area.top - 5
+        || visibleRight > area.right + 5
+        || visibleBottom > area.bottom + 5) {
+        ; Window goes off screen, restore original position
+        WinMove(origX, origY, origW, origH, hwnd)
+    }
 }
 
 ; Move active window to an adjacent monitor, keeping relative position
@@ -52,6 +77,9 @@ MoveToMonitor(direction) {
     ; Restore window if maximized
     if (WinGetMinMax(hwnd) != 0)
         WinRestore(hwnd)
+
+    ; Save original position
+    WinGetPos(&origX, &origY, &origW, &origH, hwnd)
 
     currentMonitor := GetWindowMonitor(hwnd)
     targetMonitor := GetAdjacentMonitor(currentMonitor, direction)
@@ -81,6 +109,23 @@ MoveToMonitor(direction) {
 
     ; Adjust for borders
     WinMove(newX - borders.left, newY - borders.top, newW + borders.left + borders.right, newH + borders.top + borders.bottom, hwnd)
+    Sleep(20)
+
+    ; Check if window is fully contained within target monitor work area
+    borders := GetWindowBorders(hwnd)
+    WinGetPos(&finalX, &finalY, &finalW, &finalH, hwnd)
+    visibleLeft := finalX + borders.left
+    visibleTop := finalY + borders.top
+    visibleRight := finalX + finalW - borders.right
+    visibleBottom := finalY + finalH - borders.bottom
+
+    if (visibleLeft < targetArea.left - 5
+        || visibleTop < targetArea.top - 5
+        || visibleRight > targetArea.right + 5
+        || visibleBottom > targetArea.bottom + 5) {
+        ; Window goes off screen, restore original position
+        WinMove(origX, origY, origW, origH, hwnd)
+    }
 }
 
 ; Get all visible, normal windows
