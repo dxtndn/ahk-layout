@@ -181,9 +181,6 @@ ShowCollage() {
         monitorWindows[mon].Push(hwnd)
     }
 
-    ; Collect windows that don't fit on their monitor
-    overflowWindows := []
-
     ; Arrange windows on each monitor
     Loop monitorCount {
         wins := monitorWindows[A_Index]
@@ -199,6 +196,9 @@ ShowCollage() {
 
         cellW := area.width // cols
         cellH := area.height // rows
+
+        ; Track windows that don't fit in grid
+        overflowWindows := []
 
         ; Position each window
         for i, hwnd in wins {
@@ -226,28 +226,38 @@ ShowCollage() {
             visibleBottom := newY + newH - borders.bottom
 
             if (visibleRight > cellRight + 5 || visibleBottom > cellBottom + 5) {
-                ; Window doesn't fit, add to overflow list
-                overflowWindows.Push({hwnd: hwnd, fromMonitor: A_Index})
+                ; Window doesn't fit in grid cell
+                overflowWindows.Push(hwnd)
             }
         }
-    }
 
-    ; Move overflow windows to another monitor with cascade offset
-    if (overflowWindows.Length > 0 && monitorCount > 1) {
-        cascadeOffset := 0
-        for item in overflowWindows {
-            hwnd := item.hwnd
-            fromMon := item.fromMonitor
+        ; Cascade overflow windows on the same monitor
+        if (overflowWindows.Length > 0) {
+            cascadeOffset := 0
+            for hwnd in overflowWindows {
+                borders := GetWindowBorders(hwnd)
+                WinGetPos(, , &winW, &winH, hwnd)
 
-            ; Find another monitor
-            targetMon := (fromMon = 1) ? 2 : 1
-            targetArea := GetMonitorWorkArea(targetMon)
+                ; Calculate cascade position
+                newX := area.left + cascadeOffset
+                newY := area.top + cascadeOffset
 
-            ; Place with cascade offset so windows don't fully overlap
-            borders := GetWindowBorders(hwnd)
-            WinGetPos(, , &winW, &winH, hwnd)
-            WinMove(targetArea.left - borders.left + cascadeOffset, targetArea.top - borders.top + cascadeOffset, winW, winH, hwnd)
-            cascadeOffset += 50
+                ; Check if it fits on this monitor
+                visibleRight := newX + winW
+                visibleBottom := newY + winH
+
+                if (visibleRight <= area.right + 5 && visibleBottom <= area.bottom + 5) {
+                    ; Fits on same monitor, cascade here
+                    WinMove(newX - borders.left, newY - borders.top, winW, winH, hwnd)
+                } else if (monitorCount > 1) {
+                    ; Doesn't fit, move to another monitor
+                    targetMon := (A_Index = 1) ? 2 : 1
+                    targetArea := GetMonitorWorkArea(targetMon)
+                    WinMove(targetArea.left - borders.left, targetArea.top - borders.top, winW, winH, hwnd)
+                }
+
+                cascadeOffset += 50
+            }
         }
     }
 }
