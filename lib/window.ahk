@@ -79,3 +79,94 @@ MoveToMonitor(direction) {
     ; Adjust for borders
     WinMove(newX - borders.left, newY - borders.top, newW + borders.left + borders.right, newH + borders.top + borders.bottom, hwnd)
 }
+
+; Get all visible, normal windows
+GetAllWindows() {
+    windows := []
+    for hwnd in WinGetList() {
+        ; Skip windows that aren't visible or are special
+        if (!WinExist(hwnd))
+            continue
+
+        style := WinGetStyle(hwnd)
+        exStyle := WinGetExStyle(hwnd)
+
+        ; Must be visible (WS_VISIBLE = 0x10000000)
+        if (!(style & 0x10000000))
+            continue
+
+        ; Skip tool windows (WS_EX_TOOLWINDOW = 0x80)
+        if (exStyle & 0x80)
+            continue
+
+        ; Must have a title
+        title := WinGetTitle(hwnd)
+        if (title = "")
+            continue
+
+        ; Skip minimized windows
+        if (WinGetMinMax(hwnd) = -1)
+            continue
+
+        ; Skip tiny windows (likely hidden/system)
+        WinGetPos(&x, &y, &w, &h, hwnd)
+        if (w < 100 || h < 100)
+            continue
+
+        windows.Push(hwnd)
+    }
+    return windows
+}
+
+; Arrange all windows in a collage grid per monitor
+ShowCollage() {
+    windows := GetAllWindows()
+    if (windows.Length = 0)
+        return
+
+    ; Group windows by monitor
+    monitorCount := MonitorGetCount()
+    monitorWindows := Map()
+    Loop monitorCount {
+        monitorWindows[A_Index] := []
+    }
+
+    for hwnd in windows {
+        mon := GetWindowMonitor(hwnd)
+        monitorWindows[mon].Push(hwnd)
+    }
+
+    ; Arrange windows on each monitor
+    Loop monitorCount {
+        wins := monitorWindows[A_Index]
+        if (wins.Length = 0)
+            continue
+
+        area := GetMonitorWorkArea(A_Index)
+        count := wins.Length
+
+        ; Calculate grid dimensions
+        cols := Ceil(Sqrt(count))
+        rows := Ceil(count / cols)
+
+        cellW := area.width // cols
+        cellH := area.height // rows
+
+        ; Position each window
+        for i, hwnd in wins {
+            ; Restore if maximized
+            if (WinGetMinMax(hwnd) != 0)
+                WinRestore(hwnd)
+
+            col := Mod(i - 1, cols)
+            row := (i - 1) // cols
+
+            x := area.left + col * cellW
+            y := area.top + row * cellH
+
+            ; Adjust for borders
+            borders := GetWindowBorders(hwnd)
+            WinMove(x - borders.left, y - borders.top, cellW + borders.left + borders.right, cellH + borders.top + borders.bottom, hwnd)
+        }
+    }
+}

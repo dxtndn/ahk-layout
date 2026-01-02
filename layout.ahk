@@ -29,3 +29,4 @@
 ^+c::SnapToZone("center")
 ^+,::MoveToMonitor("prev")
 ^+.::MoveToMonitor("next")
+^+Tab::ShowCollage()

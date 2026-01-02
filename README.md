@@ -50,3 +50,4 @@ All shortcuts use `Ctrl+Shift` as the modifier.
 | Ctrl+Shift+C | Center window |
 | Ctrl+Shift+, | Move to previous monitor |
 | Ctrl+Shift+. | Move to next monitor |
+| Ctrl+Shift+Tab | Show all windows in grid collage |
