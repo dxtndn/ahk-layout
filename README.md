@@ -51,3 +51,23 @@ All shortcuts use `Ctrl+Shift` as the modifier.
 | Ctrl+Shift+, | Move to previous monitor |
 | Ctrl+Shift+. | Move to next monitor |
 | Ctrl+Shift+Tab | Show all windows in grid collage |
+
+### Layout Saves
+
+| Shortcut | Action |
+|----------|--------|
+| Ctrl+Shift+S | Open save dialog |
+| Ctrl+Shift+A | Open restore dialog |
+
+Save and restore window positions across sessions with unlimited named presets.
+
+**Save Dialog:**
+- Click a save to select it, or type a new name
+- Double-click to quickly overwrite an existing save
+- Buttons: Save, Rename, Delete, Cancel
+
+**Restore Dialog:**
+- Double-click a save to restore it immediately
+- Buttons: Restore, Delete, Cancel
+
+Saves are stored in the `saves/` folder as individual files.
