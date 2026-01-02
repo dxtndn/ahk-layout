@@ -49,12 +49,18 @@ GetZone(monitorNum, zone) {
         case "bottomright":
             return {x: area.left + area.width // 2, y: area.top + area.height // 2, w: area.width // 2, h: area.height // 2}
 
-        ; Thirds
+        ; Thirds (vertical on portrait, horizontal on landscape)
         case "third1":
+            if (area.height > area.width)
+                return {x: area.left, y: area.top, w: area.width, h: area.height // 3}
             return {x: area.left, y: area.top, w: area.width // 3, h: area.height}
         case "third2":
+            if (area.height > area.width)
+                return {x: area.left, y: area.top + area.height // 3, w: area.width, h: area.height // 3}
             return {x: area.left + area.width // 3, y: area.top, w: area.width // 3, h: area.height}
         case "third3":
+            if (area.height > area.width)
+                return {x: area.left, y: area.top + (area.height // 3) * 2, w: area.width, h: area.height - (area.height // 3) * 2}
             return {x: area.left + (area.width // 3) * 2, y: area.top, w: area.width - (area.width // 3) * 2, h: area.height}
 
         ; Center
