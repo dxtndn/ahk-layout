@@ -70,4 +70,6 @@ Save and restore window positions across sessions with unlimited named presets.
 - Double-click a save to restore it immediately
 - Buttons: Restore, Delete, Cancel
 
+Windows are matched by both process and title, so multiple windows from the same app (e.g., different Chrome windows) are restored to the correct positions.
+
 Saves are stored in the `saves/` folder as individual files.
