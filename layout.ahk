@@ -20,10 +20,10 @@
 ^+j::SnapToZone("bottomleft")
 ^+k::SnapToZone("bottomright")
 
-; --- Thirds (1/2/3) ---
-^+1::SnapToZone("third1")
-^+2::SnapToZone("third2")
-^+3::SnapToZone("third3")
+; --- Thirds (Q/W/E) ---
+^+q::SnapToZone("third1")
+^+w::SnapToZone("third2")
+^+e::SnapToZone("third3")
 
 ; --- Special ---
 ^+c::SnapToZone("center")
@@ -31,6 +31,14 @@
 ^+.::MoveToMonitor("next")
 ^+Tab::ShowCollage()
 
-; --- Save/Restore Layout ---
+; --- Save/Load Layout ---
 ^+s::ShowSaveDialog()
-^+a::ShowRestoreDialog()
+^+1::LoadSaveByIndex(1)
+^+2::LoadSaveByIndex(2)
+^+3::LoadSaveByIndex(3)
+^+4::LoadSaveByIndex(4)
+^+5::LoadSaveByIndex(5)
+^+6::LoadSaveByIndex(6)
+^+7::LoadSaveByIndex(7)
+^+8::LoadSaveByIndex(8)
+^+9::LoadSaveByIndex(9)

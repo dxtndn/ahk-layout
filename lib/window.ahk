@@ -435,6 +435,14 @@ LoadFromSlot(name) {
 
 }
 
+; Load save by index (1-based)
+LoadSaveByIndex(index) {
+    saves := GetAllSaves()
+    if (index > 0 && index <= saves.Length) {
+        LoadFromSlot(saves[index])
+    }
+}
+
 ; Delete a named save
 DeleteSave(name) {
     saveFile := GetSavesDir() . "\" . name . ".txt"

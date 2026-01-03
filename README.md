@@ -39,9 +39,9 @@ All shortcuts use `Ctrl+Shift` as the modifier.
 
 | Shortcut | Zone |
 |----------|------|
-| Ctrl+Shift+1 | Left third |
-| Ctrl+Shift+2 | Center third |
-| Ctrl+Shift+3 | Right third |
+| Ctrl+Shift+Q | Left third |
+| Ctrl+Shift+W | Center third |
+| Ctrl+Shift+E | Right third |
 
 ### Special
 
@@ -57,18 +57,16 @@ All shortcuts use `Ctrl+Shift` as the modifier.
 | Shortcut | Action |
 |----------|--------|
 | Ctrl+Shift+S | Open save dialog |
-| Ctrl+Shift+A | Open restore dialog |
+| Ctrl+Shift+1-9 | Load save by index |
 
-Save and restore window positions across sessions with unlimited named presets.
+Save and restore window positions across sessions with up to 9 named presets.
+
+**Quick Load:** Press `Ctrl+Shift+1` through `Ctrl+Shift+9` to instantly load saves by their position in the list (sorted by creation time, oldest first).
 
 **Save Dialog:**
 - Click a save to select it, or type a new name
 - Double-click to quickly overwrite an existing save
 - Buttons: Save, Rename, Delete, Cancel
-
-**Restore Dialog:**
-- Double-click a save to restore it immediately
-- Buttons: Restore, Delete, Cancel
 
 Windows are matched by both process and title, so multiple windows from the same app (e.g., different Chrome windows) are restored to the correct positions.
 
