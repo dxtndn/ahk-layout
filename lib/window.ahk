@@ -335,7 +335,9 @@ SaveToSlot(name) {
     for hwnd in windows {
         WinGetPos(&x, &y, &w, &h, hwnd)
         procPath := WinGetProcessPath(hwnd)
-        line := procPath . "`t" . x . "`t" . y . "`t" . w . "`t" . h . "`n"
+        title := WinGetTitle(hwnd)
+        ; Format: processPath<TAB>title<TAB>x<TAB>y<TAB>w<TAB>h
+        line := procPath . "`t" . title . "`t" . x . "`t" . y . "`t" . w . "`t" . h . "`n"
         FileAppend(line, saveFile)
     }
 }
@@ -356,24 +358,64 @@ LoadFromSlot(name) {
             continue
 
         parts := StrSplit(line, "`t")
+        ; Support both old format (5 parts) and new format (6 parts with title)
         if (parts.Length < 5)
             continue
 
         try {
-            positions.Push({
-                procPath: parts[1],
-                x: Integer(parts[2]),
-                y: Integer(parts[3]),
-                w: Integer(parts[4]),
-                h: Integer(parts[5])
-            })
+            if (parts.Length >= 6) {
+                ; New format: procPath, title, x, y, w, h
+                positions.Push({
+                    procPath: parts[1],
+                    title: parts[2],
+                    x: Integer(parts[3]),
+                    y: Integer(parts[4]),
+                    w: Integer(parts[5]),
+                    h: Integer(parts[6])
+                })
+            } else {
+                ; Old format: procPath, x, y, w, h (no title)
+                positions.Push({
+                    procPath: parts[1],
+                    title: "",
+                    x: Integer(parts[2]),
+                    y: Integer(parts[3]),
+                    w: Integer(parts[4]),
+                    h: Integer(parts[5])
+                })
+            }
         }
     }
 
     windows := GetAllWindows()
     usedPositions := Map()
+    usedWindows := Map()
 
+    ; First pass: match by process path AND title (exact match)
     for hwnd in windows {
+        procPath := WinGetProcessPath(hwnd)
+        title := WinGetTitle(hwnd)
+
+        for i, pos in positions {
+            if (usedPositions.Has(i))
+                continue
+
+            if (pos.procPath = procPath && pos.title = title && pos.title != "") {
+                if (WinGetMinMax(hwnd) != 0)
+                    WinRestore(hwnd)
+                WinMove(pos.x, pos.y, pos.w, pos.h, hwnd)
+                usedPositions[i] := true
+                usedWindows[hwnd] := true
+                break
+            }
+        }
+    }
+
+    ; Second pass: match remaining windows by process path only
+    for hwnd in windows {
+        if (usedWindows.Has(hwnd))
+            continue
+
         procPath := WinGetProcessPath(hwnd)
 
         for i, pos in positions {
@@ -383,13 +425,14 @@ LoadFromSlot(name) {
             if (pos.procPath = procPath) {
                 if (WinGetMinMax(hwnd) != 0)
                     WinRestore(hwnd)
-
                 WinMove(pos.x, pos.y, pos.w, pos.h, hwnd)
                 usedPositions[i] := true
+                usedWindows[hwnd] := true
                 break
             }
         }
     }
+
 }
 
 ; Delete a named save
