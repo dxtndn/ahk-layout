@@ -411,25 +411,43 @@ LoadFromSlot(name) {
         }
     }
 
-    ; Second pass: match remaining windows by process path only
+    ; Second pass: match remaining windows by process path, using position proximity as tiebreaker
+    ; Build list of unmatched windows with their current positions
+    unmatchedWindows := []
     for hwnd in windows {
         if (usedWindows.Has(hwnd))
             continue
+        WinGetPos(&wx, &wy, &ww, &wh, hwnd)
+        unmatchedWindows.Push({hwnd: hwnd, procPath: WinGetProcessPath(hwnd), x: wx, y: wy})
+    }
 
-        procPath := WinGetProcessPath(hwnd)
+    ; For each unmatched position, find the closest unmatched window with matching process
+    for i, pos in positions {
+        if (usedPositions.Has(i))
+            continue
 
-        for i, pos in positions {
-            if (usedPositions.Has(i))
+        bestIdx := 0
+        bestDist := 999999999
+
+        for j, win in unmatchedWindows {
+            if (win.procPath != pos.procPath)
                 continue
 
-            if (pos.procPath = procPath) {
-                if (WinGetMinMax(hwnd) != 0)
-                    WinRestore(hwnd)
-                WinMove(pos.x, pos.y, pos.w, pos.h, hwnd)
-                usedPositions[i] := true
-                usedWindows[hwnd] := true
-                break
+            ; Calculate distance from window's current position to saved position
+            dist := Abs(win.x - pos.x) + Abs(win.y - pos.y)
+            if (dist < bestDist) {
+                bestDist := dist
+                bestIdx := j
             }
+        }
+
+        if (bestIdx > 0) {
+            hwnd := unmatchedWindows[bestIdx].hwnd
+            if (WinGetMinMax(hwnd) != 0)
+                WinRestore(hwnd)
+            WinMove(pos.x, pos.y, pos.w, pos.h, hwnd)
+            usedPositions[i] := true
+            unmatchedWindows.RemoveAt(bestIdx)
         }
     }
 
